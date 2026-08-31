@@ -1,18 +1,19 @@
-name: Production readback
+name: Проверка собственного production
 
 on:
-  schedule:
-    # Independent daily readback. Feature-specific T+24 deadlines are tracked
-    # by shipping_releases; the server promotes missed ones to overdue friction.
-    - cron: '17 3 * * *'
   workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'HTTPS-адрес API вашего развёртывания, например https://api.example.ru'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   authenticated-readback:
-    name: Authenticated production paths
+    name: Проверить защищённые production-маршруты
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: production-readback
@@ -21,9 +22,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Run authenticated readback
+
+      - name: Проверить адрес
+        shell: bash
+        env:
+          CUMORA_SMOKE_BASE: ${{ inputs.base_url }}
+        run: |
+          set -euo pipefail
+          case "$CUMORA_SMOKE_BASE" in
+            https://api.cumora.ai|https://api.cumora.ai/*)
+              echo 'Русский форк не должен проверять production исходного проекта.' >&2
+              exit 1
+              ;;
+            https://*) ;;
+            *)
+              echo 'Укажите полный HTTPS-адрес собственного API.' >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Запустить проверку
         env:
           CUMORA_SMOKE_TOKEN: ${{ secrets.CUMORA_SMOKE_TOKEN }}
           CUMORA_SMOKE_COMPANY_ID: ${{ secrets.CUMORA_SMOKE_COMPANY_ID }}
-          CUMORA_SMOKE_BASE: https://api.cumora.ai
+          CUMORA_SMOKE_BASE: ${{ inputs.base_url }}
         run: node scripts/release-smoke.mjs
