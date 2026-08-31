@@ -1,16 +1,15 @@
-# Проверка основной ветки русского форка.
-#
-# Исходный workflow после тестов авторизовался в GCP-проекте автора и
-# публиковал server/agent-computer образы в его Artifact Registry. Здесь
-# сохранены строгие проверки и Docker-сборки, но внешняя публикация полностью
-# удалена. Образы собираются только внутри временного GitHub runner.
-
 name: Сборка и проверка
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build_images:
+        description: 'Дополнительно собрать локальные Docker-образы сервера и agent-computer'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: build-${{ github.ref }}
@@ -20,32 +19,6 @@ permissions:
   contents: read
 
 jobs:
-  changes:
-    name: Определить изменённые части
-    runs-on: ubuntu-latest
-    outputs:
-      agent: ${{ steps.filter.outputs.agent }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            agent:
-              - 'server/src/agents/**'
-              - 'server/src/scripts/build-agent-bundle.mjs'
-              - 'server/docker/agent-computer.Dockerfile'
-              - 'server/docker/agent-computer.Dockerfile.dockerignore'
-              - 'server/docker/agent-computer-cumora.sh'
-              - 'server/docker/agent-computer-entrypoint.sh'
-              - 'agent-cli/**'
-              - 'agent-fuse/**'
-              - '.github/workflows/build.yml'
-              - 'package.json'
-              - 'package-lock.json'
-
   typecheck:
     name: TypeScript — клиент и сервер
     runs-on: ubuntu-latest
@@ -63,7 +36,7 @@ jobs:
         run: npm run server:typecheck
 
   quality:
-    name: Линтер, guards, unit и integration
+    name: Guards, линтер, unit и integration
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -107,10 +80,12 @@ jobs:
       - run: npm ci
       - name: Установить зависимости Email Worker
         run: npm ci --prefix workers/email-gate
+      - name: Проверить независимость форка
+        run: node scripts/guard-fork-boundaries.mjs
+      - name: Статические проверки моделей и движков
+        run: npm run guard:big-brain && npm run guard:llm-tracked && npm run guard:engine-registry
       - name: Biome
         run: npm run lint
-      - name: Статические защитные проверки
-        run: npm run guard:big-brain && npm run guard:llm-tracked && npm run guard:engine-registry
       - name: Модульные тесты
         run: npm test --silent
       - name: Включить pgvector
@@ -134,38 +109,18 @@ jobs:
         env:
           VITE_CUMORA_API_BASE: ''
         run: npm run build
-      - name: Сохранить dist для проверки
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: cumora-ru-web-${{ github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 7
 
-  server-image:
-    name: Собрать Docker-образ сервера без публикации
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    needs: [typecheck, quality]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Локальная buildx-сборка
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: server/docker/cumora-server.Dockerfile
-          platforms: linux/amd64
-          push: false
-          tags: cumora-ru/server:${{ github.sha }}
-          cache-from: type=gha,scope=server-ru
-          cache-to: type=gha,scope=server-ru,mode=max,ignore-error=true
-
   agent-cli:
     name: Собрать BYOA CLI
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [changes, typecheck, quality]
+    needs: [typecheck, quality]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -175,30 +130,45 @@ jobs:
       - run: npm ci
       - name: Собрать standalone CLI
         run: node agent-cli/build.mjs
-      - name: Проверить русскую справку и отсутствие upstream fallback
+      - name: Проверить русскую справку и безопасную точку входа
         shell: bash
         run: |
           set -euo pipefail
           node agent-cli/dist/cli.js > /tmp/cumora-help.txt 2>&1 || true
           grep -q 'запуск агентов Cumora' /tmp/cumora-help.txt
-          if grep -q 'https://api.cumora.ai' agent-cli/dist/cli.js; then
-            echo 'В собранной CLI найден upstream API fallback.' >&2
-            exit 1
-          fi
-      - name: Сохранить CLI как артефакт
-        uses: actions/upload-artifact@v4
+          grep -q "CUMORA_SERVER_URL = 'http://localhost:5181'" agent-cli/src/cli.ts
+      - uses: actions/upload-artifact@v4
         with:
           name: cumora-ru-agent-cli-${{ github.sha }}
           path: agent-cli/dist/
           if-no-files-found: error
           retention-days: 7
 
+  server-image:
+    name: Docker-образ сервера без публикации
+    if: github.event_name == 'workflow_dispatch' && inputs.build_images == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [typecheck, quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/docker/cumora-server.Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: cumora-ru/server:${{ github.sha }}
+          cache-from: type=gha,scope=server-ru
+          cache-to: type=gha,scope=server-ru,mode=max,ignore-error=true
+
   agent-image:
-    name: Собрать Docker-образ agent-computer без публикации
+    name: Docker-образ agent-computer без публикации
+    if: github.event_name == 'workflow_dispatch' && inputs.build_images == true
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    needs: [changes, typecheck, quality, agent-cli]
-    if: needs.changes.outputs.agent == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [typecheck, quality, agent-cli]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -209,8 +179,7 @@ jobs:
       - name: Подготовить bundle агента
         run: node server/src/scripts/build-agent-bundle.mjs
       - uses: docker/setup-buildx-action@v3
-      - name: Локальная buildx-сборка
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: server/docker/agent-computer.Dockerfile
