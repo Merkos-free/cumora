@@ -1,12 +1,9 @@
-# Deploy the marketing site (cumora.ai) to Cloudflare Pages.
-#
-# The Pages project `cumora` is NOT git-connected on Cloudflare's side —
-# we ship from CI so the deploy is reproducible and gated on `main`.
-# Requires two repo secrets:
-#   CLOUDFLARE_API_TOKEN     — Pages:Edit + Account:Read scope
-#   CLOUDFLARE_ACCOUNT_ID    — 787d1726b5b2844b0d2decd4767a4b62
+# Исходный workflow публиковал сайт в Cloudflare Pages-проект автора
+# `cumora` и использовал его account ID. Русский форк не должен обращаться к
+# чужому Cloudflare-аккаунту. Пока собственный домен/Pages-проект не настроен,
+# workflow только упаковывает статический сайт в проверяемый артефакт.
 
-name: Deploy website
+name: Собрать русский сайт
 
 on:
   push:
@@ -16,33 +13,50 @@ on:
       - '.github/workflows/website.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: website-${{ github.ref }}
+  group: website-artifact-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: wrangler pages deploy
+  package:
+    name: Проверить и упаковать website/
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment:
-      name: production
-      url: https://cumora.ai
-    permissions:
-      contents: read
-      deployments: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy website --project-name=cumora --branch=main --commit-hash=${{ github.sha }}
-
-      - name: Summary
+      - name: Проверить обязательные файлы
+        shell: bash
         run: |
-          echo "### cumora.ai" >> $GITHUB_STEP_SUMMARY
-          echo "- commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- live: https://cumora.ai" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          test -f website/index.html
+          test -f website/privacy.html
+          test -d website/assets
+          grep -q '<html lang="ru">' website/index.html
+          grep -q 'Merkos-free/cumora' website/index.html
+          if grep -R --line-number --fixed-strings 'api.cumora.ai' website; then
+            echo 'На сайте русского форка найдена runtime-ссылка на upstream API.' >&2
+            exit 1
+          fi
+
+      - name: Упаковать статический сайт
+        uses: actions/upload-artifact@v4
+        with:
+          name: cumora-ru-website-${{ github.sha }}
+          path: website/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Итог
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Сайт собран как артефакт
+
+          Ничего не публиковалось во внешний аккаунт. После выбора собственного
+          домена можно заменить этот job на GitHub Pages или Cloudflare Pages,
+          используя только ресурсы и секреты владельца `Merkos-free`.
+          EOF
