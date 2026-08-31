@@ -98,5 +98,20 @@
     "linter": {
       "enabled": false
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["website/index.html"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noAriaUnsupportedElements": "off"
+          },
+          "correctness": {
+            "useSortedProperties": "off"
+          }
+        }
+      }
+    }
+  ]
 }
