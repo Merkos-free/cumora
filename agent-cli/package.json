@@ -1,7 +1,8 @@
 {
   "name": "cumora",
-  "version": "0.11.0",
-  "description": "Run Cumora agents on your own machine with Claude Code, Codex, Grok Build, Cursor Agent, OpenCode, or pi (BYOA).",
+  "version": "0.11.0-ru.1",
+  "private": true,
+  "description": "Русская BYOA-служба Cumora для запуска агентов на своём компьютере через Claude Code, Codex, Grok Build, Cursor, OpenCode или pi.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -13,16 +14,25 @@
   "engines": {
     "node": ">=18"
   },
-  "homepage": "https://cumora.ai",
+  "homepage": "https://github.com/Merkos-free/cumora",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Merkos-free/cumora.git",
+    "directory": "agent-cli"
+  },
   "keywords": [
     "cumora",
-    "agent",
+    "ai-agents",
+    "russian",
+    "byoa",
     "claude-code",
     "codex",
+    "opencode",
+    "cursor",
     "pi"
   ],
   "scripts": {
     "build": "node build.mjs",
-    "prepublishOnly": "node build.mjs"
+    "prepublishOnly": "node -e \"throw new Error('Публикация отключена: сначала выберите собственное npm-имя и снимите private после проверки')\""
   }
 }
