@@ -1,78 +1,58 @@
-# Publish the `cumora` BYOA CLI to npm.
+# Исходный workflow автоматически публиковал пакет с именем `cumora` в npm.
+# Это имя и канал релизов принадлежат оригинальному проекту. Русский форк не
+# должен пытаться занять, перезаписать или случайно выпустить чужой пакет.
 #
-# Why this exists: the npm account has 2FA (auth + writes), so a manual
-# `npm publish` prompts for an interactive OTP every release. An npm
-# *automation* token bypasses 2FA for writes, so CI can publish without a
-# human-entered code — mirroring how the server already auto-deploys on
-# push to main (build.yml → deploy.yml).
-#
-# Setup (one-time): create an automation token at
-#   npmjs.com → Access Tokens → Generate → "Automation"
-# and add it as the repo secret `NPM_TOKEN`. Until that secret exists this
-# workflow no-ops cleanly (it does NOT fail), so adding the file is safe.
-#
-# Behaviour: on a push to main that touches agent-cli/ (typically the
-# `chore(agent-cli): release cumora@X` version bump), publish that version
-# — but only if it isn't already on the registry, so re-pushes are no-ops.
+# Перед публикацией собственной CLI нужно:
+#   1. выбрать доступное имя или npm-scope, принадлежащий Merkos-free;
+#   2. изменить agent-cli/package.json и команды установки в интерфейсе;
+#   3. проверить сборку пакета и запуск на macOS, Windows/WSL2 и Linux;
+#   4. создать отдельный automation token только для выбранного пакета;
+#   5. заменить эту заглушку после code review.
 
-name: Publish CLI
+name: Публикация CLI отключена — выберите своё npm-имя
 
 on:
-  push:
-    branches: [main]
-    paths: ['agent-cli/**']
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Введите ПОНИМАЮ, чтобы увидеть инструкцию. Публикации не будет.'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: publish-cli
-  cancel-in-progress: false
-
 jobs:
-  publish:
-    name: npm publish cumora
+  safety-notice:
+    name: Безопасная заглушка npm
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Gate on NPM_TOKEN presence
-        id: gate
+      - name: Проверить подтверждение
+        shell: bash
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          CONFIRMATION: ${{ inputs.confirmation }}
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::notice::NPM_TOKEN secret not set — skipping publish. Add an npm automation token as the NPM_TOKEN secret to enable auto-publish."
-            echo "go=0" >> "$GITHUB_OUTPUT"
-          else
-            echo "go=1" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$CONFIRMATION" != 'ПОНИМАЮ' ]; then
+            echo 'Подтверждение не совпало. Никаких действий не выполнено.' >&2
+            exit 1
           fi
 
-      - uses: actions/setup-node@v4
-        if: steps.gate.outputs.go == '1'
-        with:
-          node-version: 20
-          registry-url: 'https://registry.npmjs.org'
-
-      # build.mjs (run by agent-cli's prepublishOnly) imports esbuild, which
-      # lives in the repo-root node_modules — so install at the root.
-      - name: Install root deps (for the bundle build)
-        if: steps.gate.outputs.go == '1'
-        run: npm ci
-
-      - name: Publish if this version is new
-        if: steps.gate.outputs.go == '1'
-        working-directory: agent-cli
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Показать план выпуска
+        shell: bash
         run: |
-          NAME=$(node -p "require('./package.json').name")
-          VER=$(node -p "require('./package.json').version")
-          if npm view "$NAME@$VER" version >/dev/null 2>&1; then
-            echo "→ $NAME@$VER already on npm; nothing to publish."
-          else
-            echo "→ publishing $NAME@$VER"
-            npm publish --access public
-          fi
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## npm-публикация не выполнялась
+
+          Пакет `agent-cli` помечен как `private`, а этот workflow ничего не
+          публикует. Сначала зарегистрируйте собственное имя, например пакет в
+          вашем npm-scope, затем одновременно обновите:
+
+          - `agent-cli/package.json`;
+          - команды подключения компьютера в интерфейсе и документации;
+          - workflow публикации;
+          - механизм автообновления BYOA-службы;
+          - тесты установки на поддерживаемых системах.
+
+          До этого русскую CLI безопаснее запускать из клона репозитория.
+          EOF
