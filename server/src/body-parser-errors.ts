@@ -1,9 +1,8 @@
 /**
- * Convert body-parser's documented client errors into a stable public shape.
- *
- * Only known body-parser error types with a 4xx status are accepted. This
- * keeps parser failures from becoming noisy 500s without trusting arbitrary
- * application errors that happen to carry a `status` field.
+ * Преобразует известные клиентские ошибки body-parser в стабильный публичный
+ * ответ. Принимаются только документированные типы ошибок с кодом 4xx, чтобы
+ * сбой разбора запроса не превращался в 500 и при этом случайная ошибка
+ * приложения с полем `status` не выдавалась за безопасную клиентскую.
  */
 const CLIENT_ERROR_TYPES = new Set([
   'charset.unsupported',
@@ -24,8 +23,8 @@ export function publicBodyParserError(err: unknown): { status: number; message: 
   if (typeof status !== 'number' || !Number.isInteger(status) || status < 400 || status > 499) {
     return null
   }
-  if (status === 413) return { status, message: 'request entity too large' }
-  if (status === 415) return { status, message: 'unsupported request encoding' }
-  if (candidate.type === 'entity.parse.failed') return { status, message: 'invalid JSON body' }
-  return { status, message: 'invalid request body' }
+  if (status === 413) return { status, message: 'Запрос слишком большой' }
+  if (status === 415) return { status, message: 'Этот формат или кодировка запроса не поддерживается' }
+  if (candidate.type === 'entity.parse.failed') return { status, message: 'В JSON есть ошибка' }
+  return { status, message: 'Не получилось прочитать данные запроса' }
 }
