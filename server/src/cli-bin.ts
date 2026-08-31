@@ -1,18 +1,25 @@
 /**
- * Cumora CLI binary entry point.
+ * Точка входа CLI Cumora.
  *
- * Invoked via the `cumora` shell command (see ./bin/cumora) or directly:
- *   npx tsx server/src/cli-bin.ts <args...>
+ * Запускается через команду `cumora` (см. ./bin/cumora) либо напрямую:
+ *   npx tsx server/src/cli-bin.ts <аргументы...>
  */
+
+function isolateForkServerDefault(): void {
+  if (!process.env.CUMORA_SERVER_URL) {
+    process.env.CUMORA_SERVER_URL = 'http://localhost:5181'
+  }
+}
 
 async function main() {
   const argv = process.argv.slice(2)
 
-  // BYOA Computer daemon: a long-running, standalone process that runs on the
-  // user's own machine and talks to the server only over HTTP. Dispatch it
-  // BEFORE importing runCli / the DB + Redis clients so it never loads them
-  // (the daemon host has no DB/Redis access).
+  // BYOA-демон работает на компьютере пользователя и общается с сервером
+  // только по HTTP. Запускаем его до импорта клиентов БД и Redis. Одновременно
+  // задаём безопасный локальный fallback, чтобы форк никогда молча не обращался
+  // к production-серверу исходного проекта.
   if (argv[0] === 'agent' && argv[1] === 'computer') {
+    isolateForkServerDefault()
     const { runComputerDaemon } = await import('./agents/computer/daemon.js')
     await runComputerDaemon(argv.slice(2))
     return
@@ -24,9 +31,21 @@ async function main() {
   const { redis, sub } = await import('./redis.js')
 
   const shutdown = async (code: number): Promise<never> => {
-    try { await pool.end() } catch { /* ignore */ }
-    try { redis.disconnect() } catch { /* ignore */ }
-    try { sub.disconnect() } catch { /* ignore */ }
+    try {
+      await pool.end()
+    } catch {
+      // При завершении исходная ошибка важнее ошибки закрытия пула.
+    }
+    try {
+      redis.disconnect()
+    } catch {
+      // Соединение уже могло быть закрыто.
+    }
+    try {
+      sub.disconnect()
+    } catch {
+      // Соединение уже могло быть закрыто.
+    }
     process.exit(code)
   }
 
@@ -35,10 +54,10 @@ async function main() {
     await writeCliSideEffectsToResultPath(result)
     process.stdout.write(result.text + '\n')
     await shutdown(result.exitCode)
-  } catch (err) {
-    process.stderr.write(`error: ${err instanceof Error ? err.message : String(err)}\n`)
+  } catch (error) {
+    process.stderr.write(`ошибка: ${error instanceof Error ? error.message : String(error)}\n`)
     await shutdown(2)
   }
 }
 
-main()
+void main()
