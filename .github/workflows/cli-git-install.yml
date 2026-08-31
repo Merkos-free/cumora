@@ -1,0 +1,47 @@
+name: Установка русской CLI из GitHub
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'agent-cli/**'
+      - 'server/src/agents/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'bin/**'
+      - '.github/workflows/cli-git-install.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cli-git-install-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: npm exec из текущего SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Установить Git-package и запустить русскую справку
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          SPEC="github:Merkos-free/cumora#$HEAD_SHA"
+          echo "Проверяем $SPEC"
+          npm exec --yes --package="$SPEC" -- cumora > /tmp/cumora-help.txt 2>&1
+          cat /tmp/cumora-help.txt
+          grep -q 'запуск агентов Cumora' /tmp/cumora-help.txt
+          grep -q 'Укажите адрес своего сервера' /tmp/cumora-help.txt
+          if grep -q 'api.cumora.ai' /tmp/cumora-help.txt; then
+            echo 'Русская CLI снова предлагает upstream API.' >&2
+            exit 1
+          fi
