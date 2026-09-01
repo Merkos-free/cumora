@@ -1,0 +1,31 @@
+name: Снимок исходников для аудита
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/source-snapshot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Упаковать исходники рабочей ветки
+        run: git archive --format=zip --output=cumora-ru-source.zip HEAD
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cumora-ru-source
+          path: cumora-ru-source.zip
+          if-no-files-found: error
+          retention-days: 1
