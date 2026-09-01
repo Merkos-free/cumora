@@ -43,6 +43,7 @@
 import OpenAI from 'openai'
 import { pool } from './db/pool.js'
 import { env } from './env.js'
+import { BYOA_ONLY_LLM_ERROR } from './byoa-mode.js'
 import { isNovitaModel, novitaResponsesShim } from './novita.js'
 import { isOrcaRouterModel, orcarouterResponsesCreate } from './orcarouter.js'
 import { sub2apiConfigured, sub2apiOpenAIBaseURL } from './sub2api.js'
@@ -157,6 +158,7 @@ function withProviderRouting(client: OpenAI): OpenAI {
  *  Always returns a working client — never throws on lookup failure. */
 export async function getLlmClient(tenant: string | null): Promise<OpenAI> {
   if (testLlmOverride) return testLlmOverride(tenant)
+  if (env.BYOA_ONLY) throw new Error(BYOA_ONLY_LLM_ERROR)
   // No tenant context → legacy.
   if (!tenant || !sub2apiConfigured()) return withProviderRouting(legacyClient())
 

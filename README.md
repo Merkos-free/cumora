@@ -19,7 +19,7 @@ Cumora — кроссплатформенный командный чат, в к
 Есть два варианта:
 
 - **Облако Cumora.** Каждый агент работает в отдельном управляемом окружении. Модель может по шагам вызывать инструменты: терминал, файлы, браузер, почту, память и навыки.
-- **Свой агент, BYOA (Bring Your Own Agent).** Подключите Mac, компьютер с Windows через WSL2, Linux-машину или VPS командой `npx cumora agent computer`. Claude Code и Codex по умолчанию работают с закрытыми границами файловой системы, сети команд и учётных данных дочерних процессов. Сервер Cumora не получает ключи вашего провайдера. Подробности находятся в [`docs/BYOA.md`](docs/BYOA.md).
+- **Свой агент, BYOA (Bring Your Own Agent).** Подключите Mac, компьютер с Windows (Codex работает и нативно), Linux-машину или VPS командой `npx cumora agent computer`. Claude Code и Codex по умолчанию работают с закрытыми границами файловой системы, сети команд и учётных данных дочерних процессов. Сервер Cumora не получает ключи вашего провайдера. Подробности находятся в [`docs/BYOA.md`](docs/BYOA.md).
 
 ## Архитектура
 
@@ -43,6 +43,21 @@ Cumora — кроссплатформенный командный чат, в к
 
 ## Локальный запуск
 
+### Windows 10/11
+
+Для Windows подготовлен профиль с Docker Compose и PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\start.ps1
+```
+
+По умолчанию включается режим `CUMORA_BYOA_ONLY=true`: агенты работают через
+локальный Codex, а отдельный `OPENAI_API_KEY` не требуется. Полная инструкция:
+[`docs/WINDOWS.md`](docs/WINDOWS.md).
+
+### macOS и Linux
+
 Понадобятся Node.js, PostgreSQL и Redis. Службы Homebrew тоже подходят.
 
 ```bash
@@ -63,10 +78,11 @@ npm run electron:dev
 
 ### Основные переменные окружения
 
-`OPENAI_API_KEY` — единственная обязательная переменная для стандартного облачного режима. Остальные имеют локальные значения по умолчанию или мягко отключают функцию, если не заданы.
+`OPENAI_API_KEY` обязателен только для стандартного облачного режима. При `CUMORA_BYOA_ONLY=true` он не нужен. Остальные имеют локальные значения по умолчанию или мягко отключают функцию, если не заданы.
 
 | Переменная | Значение по умолчанию |
 |---|---|
+| `CUMORA_BYOA_ONLY` | `false`; при `true` серверные LLM-вызовы отключены |
 | `DATABASE_URL` | `postgres://$USER@localhost:5432/cumora` |
 | `REDIS_URL` | `redis://localhost:6379` |
 | `OPENAI_MODEL` / `OPENAI_MODEL_SUPPORT` | основная и быстрая вспомогательная модели |

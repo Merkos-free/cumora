@@ -1,0 +1,39 @@
+name: cumora-local
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cumora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cumora
+      POSTGRES_PASSWORD: cumora
+      POSTGRES_DB: cumora
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - cumora-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cumora -d cumora"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: cumora-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - cumora-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  cumora-postgres-data:
+  cumora-redis-data:

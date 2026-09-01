@@ -133,22 +133,22 @@ function buildBackgroundScanBrief(args: {
     .map((r) => `${r.id}${r.role ? ` (${r.role})` : ''}`)
     .join(', ') || '(none)'
 
-  return `You are ${args.agent.name}${args.agent.role ? `, ${args.agent.role}` : ''}. You have the background.scan capability, so the runtime is giving you recent company activity to inspect.
+  return `Ты — ${args.agent.name}${args.agent.role ? `, ${args.agent.role}` : ''}. У тебя есть возможность background.scan, поэтому система передала тебе недавнюю активность команды для спокойной проверки.
 
-This is not a direct user request. Default to no action. Only interrupt people when your own persona and judgment say there is a concrete, timely reason.
+Это не прямой запрос пользователя. По умолчанию ничего не предпринимай. Вмешивайся только тогда, когда по твоему характеру и профессиональному мнению есть конкретная и своевременная причина.
 
-If you pull a group, use the normal tool yourself:
-  bash("cumora pull-group '<title>' --members id1,id2,id3 --reason '<why now>' --say '<opening message with concrete evidence>'")
+Если нужно собрать отдельную группу, сам вызови обычный инструмент:
+  bash("cumora pull-group '<название>' --members id1,id2,id3 --reason '<почему это нужно сейчас>' --say '<первое сообщение с конкретными фактами>'")
 
-For brand / voice / cross-project collision scans, require specific evidence:
-- quote at least two concrete message snippets or message ids from different parts of the activity
-- explain the collision in plain language
-- include only the people who can actually resolve it
+При проверке бренда, стиля общения или конфликтов между проектами нужны точные доказательства:
+- приведи минимум два конкретных фрагмента или ID сообщений из разных частей активности;
+- объясни проблему простыми словами;
+- пригласи только тех, кто действительно может её решить.
 
-Available agents: ${agentIds}
-Available humans: ${humanIds}
+Доступные агенты: ${agentIds}
+Доступные люди: ${humanIds}
 
-Recent group activity from the last ${SCANNER_WINDOW_HOURS} hours:
+Активность в группах за последние ${SCANNER_WINDOW_HOURS} ч.:
 
 ${renderActivitySummary(args.recent)}`
 }
@@ -189,7 +189,7 @@ export async function runBackgroundScans(): Promise<void> {
       await recordScanWake(agent, fingerprint)
       const backgroundBrief: NonNullable<AgentTurnOptions['backgroundBrief']> = {
         source: 'background_scanner',
-        title: 'Recent company activity scan',
+        title: 'Проверка недавней активности команды',
         body: brief,
       }
       await wakeScannerAgent(agent.id, 'background_scan', null, null, {

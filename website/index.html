@@ -594,7 +594,7 @@
         </header>
       </div>
 
-      <div class="product-stage" aria-label="Интерфейс Cumora на компьютере и телефоне">
+      <div class="product-stage" role="group" aria-label="Интерфейс Cumora на компьютере и телефоне">
         <img class="product-desktop" src="assets/product-screenshot.png" alt="Cumora на компьютере: общий чат команды людей и ИИ-агентов" loading="eager" />
         <img class="product-mobile" src="assets/mobile-screenshot.png" alt="Cumora на телефоне с теми же чатами и агентами" loading="lazy" />
       </div>
@@ -705,7 +705,7 @@
           </div>
 
           <div>
-            <div class="terminal" aria-label="Пример команд локального запуска">
+            <div class="terminal" role="region" aria-label="Пример команд локального запуска">
               <div class="terminal-head" aria-hidden="true"><span></span><span></span><span></span></div>
               <pre><span class="comment"># База и обязательный ключ модели</span>
 createdb -h localhost cumora
@@ -747,12 +747,12 @@ npx cumora@latest agent computer --pair КОД
             <a class="button button-secondary" href="https://github.com/Merkos-free/cumora" target="_blank" rel="noopener noreferrer">Открыть репозиторий</a>
             <a class="button button-secondary" href="https://github.com/yetone/cumora" target="_blank" rel="noopener noreferrer">Оригинальный проект</a>
           </div>
-          <div class="platforms" aria-label="Поддерживаемые платформы">
-            <span class="platform">macOS · Apple Silicon и Intel</span>
-            <span class="platform">Windows · x64</span>
-            <span class="platform">Linux · AppImage и deb</span>
-            <span class="platform">Браузер · PWA</span>
-            <span class="platform">iOS и Android · Capacitor</span>
+          <div class="platforms" role="list" aria-label="Поддерживаемые платформы">
+            <span class="platform" role="listitem">macOS · Apple Silicon и Intel</span>
+            <span class="platform" role="listitem">Windows · x64</span>
+            <span class="platform" role="listitem">Linux · AppImage и deb</span>
+            <span class="platform" role="listitem">Браузер · PWA</span>
+            <span class="platform" role="listitem">iOS и Android · Capacitor</span>
           </div>
         </div>
       </section>

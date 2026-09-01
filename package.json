@@ -54,7 +54,11 @@
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "mobile:ios:run": "npm run mobile:sync && npx cap run ios",
     "mobile:android": "npm run mobile:sync && npx cap open android",
-    "mobile:android:run": "npm run mobile:sync && npx cap run android"
+    "mobile:android:run": "npm run mobile:sync && npx cap run android",
+    "windows:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/setup.ps1",
+    "windows:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start.ps1",
+    "windows:start:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start.ps1 -Desktop",
+    "windows:agent": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start-agent.ps1"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
