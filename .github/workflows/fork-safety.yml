@@ -1,0 +1,28 @@
+name: Безопасность русского форка
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: fork-safety-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  boundaries:
+    name: Не вернуть чужой API и инфраструктуру
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Проверить границы форка
+        run: node scripts/guard-fork-boundaries.mjs

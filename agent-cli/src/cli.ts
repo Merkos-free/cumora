@@ -1,35 +1,48 @@
 /**
- * `cumora` — the published, standalone BYOA agent-daemon CLI.
+ * `cumora` — самостоятельная CLI-служба для запуска BYOA-агентов.
  *
- * This is the entry point for the public npm package (`npx cumora …`). It is
- * intentionally tiny: it only knows how to run the BYOA "agent computer"
- * daemon, which talks to a Cumora server purely over HTTP (no DB/Redis, no
- * repo). The daemon source lives in the main repo
- * (server/src/agents/computer/) and is bundled in by agent-cli/build.mjs, so
- * there's a single source of truth.
+ * Это точка входа публичного npm-пакета (`npx cumora …`). Она запускает
+ * фоновую службу «компьютера агентов», которая общается с сервером Cumora
+ * только по HTTP и не требует прямого доступа к базе данных или Redis.
  */
-import { runComputerDaemon } from '../../server/src/agents/computer/daemon.js'
+
+/**
+ * Исходный демон исторически использует api.cumora.ai, если адрес нигде не
+ * указан. Русский форк не должен молча уходить на чужую инфраструктуру, поэтому
+ * до динамического импорта задаём безопасный локальный fallback. Сохранённый
+ * адрес уже подключённого компьютера и явный `--server` по-прежнему имеют
+ * приоритет внутри демона.
+ */
+function isolateForkServerDefault(): void {
+  if (!process.env.CUMORA_SERVER_URL) {
+    process.env.CUMORA_SERVER_URL = 'http://localhost:5181'
+  }
+}
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2)
   if (argv[0] === 'agent' && argv[1] === 'computer') {
+    isolateForkServerDefault()
+    const { runComputerDaemon } = await import('../../server/src/agents/computer/daemon.js')
     await runComputerDaemon(argv.slice(2))
     return
   }
+
   process.stderr.write(
-    'cumora — run your Cumora agents on this machine (BYOA)\n\n' +
-    'Usage:\n' +
-    '  npx cumora@latest agent computer --pair <code> [--server <url>]   pair this machine\n' +
-    '  npx cumora@latest agent computer [--server <url>]                 start the daemon\n\n' +
-    'Secure default: Claude Code on macOS/Linux/WSL2, or Codex on macOS/Linux/WSL2/Windows.\n' +
-    'Other engines require the high-risk CUMORA_BYOA_ALLOW_UNSANDBOXED=1 compatibility switch. Get a pairing code from\n' +
-    'Cumora → You → Computers → Add a computer.\n',
+    'cumora — запуск агентов Cumora на этом компьютере (BYOA)\n\n' +
+    'Использование:\n' +
+    '  npx cumora@latest agent computer --pair <код> [--server <адрес>]   подключить компьютер\n' +
+    '  npx cumora@latest agent computer [--server <адрес>]               запустить фоновую службу\n\n' +
+    'Безопасный вариант по умолчанию: Claude Code на macOS/Linux/WSL2 или Codex на macOS/Linux/WSL2/Windows.\n' +
+    'Для других движков требуется рискованный режим совместимости CUMORA_BYOA_ALLOW_UNSANDBOXED=1.\n' +
+    'Укажите адрес своего сервера через --server или CUMORA_SERVER_URL. Без него используется локальный http://localhost:5181.\n' +
+    'Код подключения находится в Cumora → Вы → Компьютеры → Подключить компьютер.\n',
   )
   process.exit(argv.length ? 1 : 0)
 }
 
-void main().catch((err) => {
-  const message = err instanceof Error ? err.message : String(err)
+void main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error)
   process.stderr.write(`cumora: ${message}\n`)
   process.exit(70)
 })

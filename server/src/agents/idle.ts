@@ -109,7 +109,7 @@ async function recordIdleWake(agent: IdleCandidate, ref: IdleLogRef): Promise<vo
       `log-${randomUUID().slice(0, 12)}`,
       agent.id,
       agent.company_id,
-      `idle wake queued for ${agent.name}`,
+      `фоновое пробуждение поставлено в очередь для ${agent.name}`,
       JSON.stringify(ref),
     ],
   )
@@ -130,6 +130,29 @@ export async function runIdleTick(): Promise<void> {
 
       const agenda = await gatherAgentAgenda(agent.id, agent.company_id)
 
+      if (env.BYOA_ONLY && agendaHasItems(agenda)) {
+        const focus = 'Проверь текущие задачи и события'
+        const briefBody = renderAgendaBrief(agenda, focus)
+        await recordIdleWake(agent, {
+          source: 'idle_scheduler',
+          companyId: agent.company_id,
+          status: agent.status,
+          lastSpoke: agent.last_spoke,
+          agendaCards: agenda.cards.length,
+          agendaEvents: agenda.events.length,
+          agendaVerdict: 'actionable',
+          agendaFocus: focus,
+        })
+        await wakeIdleAgent(agent.id, 'background_scan', null, null, {
+          backgroundBrief: {
+            source: 'agenda_scheduler',
+            title: focus,
+            body: briefBody,
+          },
+        })
+        continue
+      }
+
       if (!agendaHasItems(agenda)) {
         // No assigned cards, no current-slot events — preserve the original
         // heartbeat behavior (spontaneous nudge) so agents without an agenda
@@ -144,7 +167,7 @@ export async function runIdleTick(): Promise<void> {
           agendaVerdict: 'empty',
         })
         await wakeIdleAgent(agent.id, 'idle', null, null, {
-          idleReason: `idle heartbeat after at least ${env.IDLE_MIN_QUIET_MIN} quiet minute(s)`,
+          idleReason: `проверка после как минимум ${env.IDLE_MIN_QUIET_MIN} мин. тишины`,
         })
         continue
       }
@@ -177,7 +200,7 @@ export async function runIdleTick(): Promise<void> {
         // with assigned cards into a no-op.
         if (classifierFailed) {
           await wakeIdleAgent(agent.id, 'idle', null, null, {
-            idleReason: `idle heartbeat after at least ${env.IDLE_MIN_QUIET_MIN} quiet minute(s) (agenda triage unavailable)`,
+            idleReason: `проверка после как минимум ${env.IDLE_MIN_QUIET_MIN} мин. тишины (быстрый разбор повестки недоступен)`,
           })
         }
         continue
@@ -199,7 +222,7 @@ export async function runIdleTick(): Promise<void> {
       await wakeIdleAgent(agent.id, 'background_scan', null, null, {
         backgroundBrief: {
           source: 'agenda_scheduler',
-          title: verdict.focus || 'Heartbeat agenda',
+          title: verdict.focus || 'Текущая повестка',
           body: briefBody,
         },
       })

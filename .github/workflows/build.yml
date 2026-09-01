@@ -1,73 +1,26 @@
-# Auto-build + push images on every push to main.
-#
-# Server image: rebuilt on every push (so even a renderer-only change
-#   still produces a fresh tagged server image we can pin to).
-# Agent-computer image: rebuilt ONLY when files that affect the bundled
-#   agent runtime change — its build dominates the workflow time and
-#   the agent runtime is unaffected by typical UI / docs / k8s changes.
-#
-# This workflow ONLY builds. Deploy is a separate manual workflow
-# (deploy.yml) so a bad commit on main doesn't auto-ship to prod —
-# trade-off chosen explicitly: "手动触发" / tag push.
-
-name: Build
+name: Сборка и проверка
 
 on:
   push:
     branches: [main]
-  # Allow running this manually too (e.g. force a rebuild of a tag).
   workflow_dispatch:
+    inputs:
+      build_images:
+        description: 'Дополнительно собрать локальные Docker-образы сервера и agent-computer'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: false  # finish in-flight builds; cheaper than wasted Docker layers
+  cancel-in-progress: false
 
-env:
-  GCP_PROJECT: cumora
-  AR_REGION: us-west2
-  AR_REPO: cumora
-
-# WIF requires id-token write to mint the OIDC assertion.
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  changes:
-    name: Detect changed paths
-    runs-on: ubuntu-latest
-    outputs:
-      agent: ${{ steps.f.outputs.agent }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: f
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            agent:
-              - 'server/src/agents/**'
-              - 'server/src/scripts/build-agent-bundle.mjs'
-              - 'server/docker/agent-computer.Dockerfile'
-              - 'server/docker/agent-computer.Dockerfile.dockerignore'
-              - 'server/docker/agent-computer-cumora.sh'
-              - 'server/docker/agent-computer-entrypoint.sh'
-              - 'agent-fuse/**'
-              - '.github/workflows/build.yml'
-              - 'package.json'
-              - 'package-lock.json'
-
   typecheck:
-    # Direct pushes to main bypass pr.yml entirely — and the Docker
-    # build doesn't run `tsc` against server sources (Dockerfile
-    # CMD is `tsx server/src/index.ts`, no AOT compile). Without
-    # this gate, a commit that adds `import { foo } from '../bar'`
-    # but forgets to stage the matching `export function foo` in
-    # bar.ts builds a "successful" image that crashloops on first
-    # start. That exact bug took prod down for ~7h in mid-May 2026
-    # (dcd8e87 → 16c7fdf). Fail-fast HERE so we never publish a
-    # broken image, instead of discovering it minutes later via
-    # k8s rollout timeout.
-    name: Typecheck (server + client)
+    name: TypeScript — клиент и сервер
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -75,17 +28,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: npm
       - run: npm ci
-      - name: tsc (client)
-        run: npx tsc --noEmit
-      - name: tsc (server)
+      - name: Проверить клиент
+        run: npm run typecheck
+      - name: Проверить сервер
         run: npm run server:typecheck
 
   quality:
-    name: Guards + unit + integration
+    name: Guards, линтер, unit и integration
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -123,138 +76,115 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: npm
       - run: npm ci
-      - name: Install Email Worker dependencies
+      - name: Установить зависимости Email Worker
         run: npm ci --prefix workers/email-gate
-      - name: Lint (Biome)
+      - name: Проверить независимость форка
+        run: node scripts/guard-fork-boundaries.mjs
+      - name: Статические проверки моделей и движков
+        run: npm run guard:big-brain && npm run guard:llm-tracked && npm run guard:engine-registry
+      - name: Biome
         run: npm run lint
-      - name: Static safety guards
-        run: npm run guard:big-brain && npm run guard:llm-tracked
-      - name: Unit tests
+      - name: Модульные тесты
         run: npm test --silent
-      - name: Enable pgvector extension
+      - name: Включить pgvector
         run: PGPASSWORD=cumora psql -h localhost -U cumora -d cumora_test -c "CREATE EXTENSION IF NOT EXISTS vector"
-      - name: Integration tests
+      - name: Интеграционные тесты
         run: npm run test:integration
 
-  server:
-    name: Build server image
+  web-build:
+    name: Production-сборка интерфейса
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [changes, typecheck, quality]
-    outputs:
-      digest: ${{ steps.push.outputs.digest }}
-      tag: ${{ steps.meta.outputs.tag }}
+    timeout-minutes: 12
+    needs: [typecheck, quality]
     steps:
       - uses: actions/checkout@v4
-
-      - id: meta
-        name: Compute image tag
-        run: |
-          # Short SHA — same convention as our local builds (e.g. d1389e2).
-          SHA=$(git rev-parse --short HEAD)
-          echo "tag=$SHA" >> $GITHUB_OUTPUT
-
-      - uses: google-github-actions/auth@v2
+      - uses: actions/setup-node@v4
         with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Собрать интерфейс без upstream API
+        env:
+          VITE_CUMORA_API_BASE: ''
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cumora-ru-web-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
 
-      - uses: google-github-actions/setup-gcloud@v2
+  agent-cli:
+    name: Собрать BYOA CLI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [typecheck, quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Собрать standalone CLI
+        run: node agent-cli/build.mjs
+      - name: Проверить русскую справку и безопасную точку входа
+        shell: bash
+        run: |
+          set -euo pipefail
+          node agent-cli/dist/cli.js > /tmp/cumora-help.txt 2>&1 || true
+          grep -q 'запуск агентов Cumora' /tmp/cumora-help.txt
+          grep -q "CUMORA_SERVER_URL = 'http://localhost:5181'" agent-cli/src/cli.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cumora-ru-agent-cli-${{ github.sha }}
+          path: agent-cli/dist/
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.AR_REGION }}-docker.pkg.dev --quiet
-
+  server-image:
+    name: Docker-образ сервера без публикации
+    if: github.event_name == 'workflow_dispatch' && inputs.build_images == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [typecheck, quality]
+    steps:
+      - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-
-      - id: push
-        name: buildx build + push (server)
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: server/docker/cumora-server.Dockerfile
           platforms: linux/amd64
-          push: true
-          build-args: |
-            VITE_PUBLIC_POSTHOG_KEY=${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
-            VITE_PUBLIC_POSTHOG_HOST=${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
-          tags: |
-            ${{ env.AR_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_REPO }}/server:${{ steps.meta.outputs.tag }}
-            ${{ env.AR_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_REPO }}/server:latest
-          cache-from: type=gha,scope=server
-          # ignore-error: exporting the layer cache talks to GitHub's cache
-          # service AFTER the image is already pushed — a cache-side i/o
-          # timeout must not fail a build whose artifact succeeded (bit us
-          # on f8d0b97: image pushed, run red).
-          cache-to: type=gha,scope=server,mode=max,ignore-error=true
+          push: false
+          tags: cumora-ru/server:${{ github.sha }}
+          cache-from: type=gha,scope=server-ru
+          cache-to: type=gha,scope=server-ru,mode=max,ignore-error=true
 
-      - name: Summary
-        run: |
-          echo "### Server image" >> $GITHUB_STEP_SUMMARY
-          echo "- tag: \`${{ steps.meta.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- digest: \`${{ steps.push.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Pinned reference for kubectl set image:" >> $GITHUB_STEP_SUMMARY
-          echo "\`${{ env.AR_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_REPO }}/server@${{ steps.push.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
-
-  agent:
-    name: Build agent-computer image
+  agent-image:
+    name: Docker-образ agent-computer без публикации
+    if: github.event_name == 'workflow_dispatch' && inputs.build_images == true
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: [changes, typecheck, quality]
-    if: needs.changes.outputs.agent == 'true'
-    outputs:
-      digest: ${{ steps.push.outputs.digest }}
-      tag: ${{ steps.meta.outputs.tag }}
+    timeout-minutes: 35
+    needs: [typecheck, quality, agent-cli]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-
+          cache: npm
       - run: npm ci
-
-      - name: Bundle agent CLI
+      - name: Подготовить bundle агента
         run: node server/src/scripts/build-agent-bundle.mjs
-
-      - id: meta
-        name: Compute image tag
-        run: |
-          SHA=$(git rev-parse --short HEAD)
-          echo "tag=$SHA" >> $GITHUB_OUTPUT
-
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_DEPLOY_SA }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.AR_REGION }}-docker.pkg.dev --quiet
-
       - uses: docker/setup-buildx-action@v3
-
-      - id: push
-        name: buildx build + push (agent-computer)
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: server/docker/agent-computer.Dockerfile
           platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.AR_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_REPO }}/agent-computer:${{ steps.meta.outputs.tag }}
-            ${{ env.AR_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_REPO }}/agent-computer:latest
-          cache-from: type=gha,scope=agent
-          # Same ignore-error rationale as the server image above.
-          cache-to: type=gha,scope=agent,mode=max,ignore-error=true
-
-      - name: Summary
-        run: |
-          echo "### Agent-computer image" >> $GITHUB_STEP_SUMMARY
-          echo "- tag: \`${{ steps.meta.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- digest: \`${{ steps.push.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          push: false
+          tags: cumora-ru/agent-computer:${{ github.sha }}
+          cache-from: type=gha,scope=agent-ru
+          cache-to: type=gha,scope=agent-ru,mode=max,ignore-error=true

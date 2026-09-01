@@ -1,0 +1,68 @@
+name: Windows — сборка русской версии
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "electron/**"
+      - "agent-cli/**"
+      - "scripts/windows/**"
+      - "server/src/byoa-mode.ts"
+      - "server/src/env.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Установить зависимости
+        run: npm ci
+
+      - name: Проверить TypeScript
+        run: |
+          npm run typecheck
+          npm run server:typecheck
+
+      - name: Собрать web и русскую CLI
+        run: |
+          npm run build
+          node agent-cli/build.mjs
+          node agent-cli/dist/cli.js
+
+      - name: Проверить PowerShell-скрипты
+        shell: pwsh
+        run: |
+          $errors = @()
+          Get-ChildItem scripts/windows/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            $errors += $parseErrors
+          }
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }

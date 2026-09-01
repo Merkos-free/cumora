@@ -36,6 +36,9 @@ import { notifyAlert } from './alerting.js'
 import { startShippingMaintenance } from './shipping-maintenance.js'
 
 async function main() {
+  if (env.BYOA_ONLY) {
+    console.log('[boot] BYOA-only: серверные LLM-вызовы отключены; агенты работают через подключённые компьютеры')
+  }
   await ensureSchemaWithBootRetry()
   await seedIfEmpty()
   // Promote CUMORA_ADMIN_EMAILS members to is_admin on every boot —

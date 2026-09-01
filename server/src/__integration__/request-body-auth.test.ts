@@ -114,13 +114,13 @@ test('[integration] ordinary anonymous API JSON is capped at 256KB', async () =>
     JSON.stringify({ padding: 'x'.repeat(300 * 1024) }),
   )
   assert.equal(response.status, 413)
-  assert.deepEqual(JSON.parse(response.body), { error: 'request entity too large' })
+  assert.deepEqual(JSON.parse(response.body), { error: 'Запрос слишком большой' })
 })
 
 test('[integration] malformed ordinary JSON returns a stable 400 response', async () => {
   const response = await postRaw('/api/auth/apple/native', '{malformed')
   assert.equal(response.status, 400)
-  assert.deepEqual(JSON.parse(response.body), { error: 'invalid JSON body' })
+  assert.deepEqual(JSON.parse(response.body), { error: 'В JSON есть ошибка' })
 })
 
 test('[integration] unsupported JSON charset remains a stable 415 client error', async () => {
@@ -128,7 +128,9 @@ test('[integration] unsupported JSON charset remains a stable 415 client error',
     'content-type': 'application/json; charset=iso-8859-1',
   })
   assert.equal(response.status, 415)
-  assert.deepEqual(JSON.parse(response.body), { error: 'unsupported request encoding' })
+  assert.deepEqual(JSON.parse(response.body), {
+    error: 'Этот формат или кодировка запроса не поддерживается',
+  })
 })
 
 test('[integration] unsupported content encoding remains a stable 415 client error', async () => {
@@ -136,5 +138,7 @@ test('[integration] unsupported content encoding remains a stable 415 client err
     'content-encoding': 'x-unsupported',
   })
   assert.equal(response.status, 415)
-  assert.deepEqual(JSON.parse(response.body), { error: 'unsupported request encoding' })
+  assert.deepEqual(JSON.parse(response.body), {
+    error: 'Этот формат или кодировка запроса не поддерживается',
+  })
 })

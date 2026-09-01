@@ -6,6 +6,7 @@
  *  environment win over those in `.env` (dotenv default), so deployment
  *  doesn't need a file. */
 import 'dotenv/config'
+import { BYOA_ONLY, BYOA_ONLY_PLACEHOLDER_KEY } from './byoa-mode.js'
 
 function required(name: string, fallback?: string): string {
   const v = process.env[name] ?? fallback
@@ -34,7 +35,12 @@ export const env = {
   NODE_ENV: process.env.NODE_ENV ?? 'development',
   DATABASE_URL: required('DATABASE_URL', `postgres://${process.env.USER ?? 'postgres'}@localhost:5432/cumora`),
   REDIS_URL: required('REDIS_URL', 'redis://localhost:6379'),
-  OPENAI_API_KEY: required('OPENAI_API_KEY'),
+  /** When true, every agent must run through a paired BYOA computer and
+   * server-side LLM calls are blocked. A real OpenAI key is not required. */
+  BYOA_ONLY,
+  OPENAI_API_KEY: BYOA_ONLY
+    ? (process.env.OPENAI_API_KEY ?? BYOA_ONLY_PLACEHOLDER_KEY)
+    : required('OPENAI_API_KEY'),
   /**
    * "Brain" model — the agent's main reasoning loop and convene speech.
    * Default model used when an agent's `participants.model` is NULL.

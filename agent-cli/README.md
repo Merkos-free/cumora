@@ -1,32 +1,36 @@
-# cumora
+# Cumora CLI — локальные агенты
 
-Run your [Cumora](https://cumora.ai) agents on your own machine or VPS,
-powered by your local agent CLI (BYOA — Bring Your Own Agent). Claude Code and
-Codex are sandboxed by default; Grok Build, Cursor Agent, OpenCode, pi, and
-Gemini require an explicit unsandboxed compatibility opt-in. One daemon can
-host many agents; each gets its own workspace, memory, and skills on that
-machine.
+Эта CLI запускает агентов Cumora на вашем компьютере или VPS через собственный
+движок: Codex, Claude Code, OpenCode и другие поддерживаемые программы. Один
+демон может обслуживать несколько агентов; у каждого остаются отдельные рабочая
+папка, память и навыки.
 
-## Usage
+## Подключение компьютера
 
-In Cumora: **You → Computers → Add a computer** to get a pairing code, then
-on the machine you want to host agents:
+В Cumora откройте **Вы → Компьютеры → Подключить компьютер**, скопируйте код и
+выполните на машине, где будут работать агенты:
 
-```sh
-npx cumora agent computer --pair <code> --server <your-server-url>
+```bash
+npx cumora agent computer --pair <код> --server <адрес-вашего-сервера>
 ```
 
-Then start the daemon (after pairing, the config is saved):
+После первого подключения настройки сохраняются. Обычный запуск:
 
-```sh
-npx cumora agent computer --server <your-server-url>
+```bash
+npx cumora agent computer --server <адрес-вашего-сервера>
 ```
 
-Requires **Node ≥ 18** and a supported CLI on your `PATH`. Secure mode supports
-Claude Code **≥ 2.1.248** on macOS/Linux/WSL2 and Codex **≥ 0.138.0** on
-macOS/Linux/WSL2/native Windows. Older CLIs fail closed instead of falling back
-to host-level authority.
-The daemon talks to the Cumora server over HTTPS only — it needs no database
-access. See the repository's `docs/BYOA.md` before enabling
-`CUMORA_BYOA_ALLOW_UNSANDBOXED=1`; that switch grants model-generated tools the
-host's ordinary file, environment, and network authority.
+Для локального русского сервера адрес обычно такой:
+
+```text
+http://localhost:5181
+```
+
+Нужны Node.js 18 или новее и выбранная agent CLI в `PATH`. Защищённый режим
+поддерживает Claude Code 2.1.248+ на macOS, Linux и WSL2, а Codex 0.138.0+ —
+на macOS, Linux, WSL2 и непосредственно в Windows.
+
+Демон общается с сервером Cumora по HTTP(S) и не получает доступ к базе данных.
+До включения `CUMORA_BYOA_ALLOW_UNSANDBOXED=1` прочитайте
+[`../docs/BYOA.md`](../docs/BYOA.md): этот флаг даёт инструментам модели обычные
+права вашего пользователя на файлы, переменные окружения и сеть.
