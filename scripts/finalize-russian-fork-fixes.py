@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Small follow-up fixes applied after finalize-russian-fork.py."""
 
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,5 +59,16 @@ replace_once(
     '    @"\nNODE_ENV=development',
     '    $envText = @"\nNODE_ENV=development',
 )
+
+# The workflow token cannot create another workflow. The validated Windows
+# workflow is added separately through the repository connector after this
+# generated commit lands.
+windows_workflow = ROOT / ".github/workflows/windows.yml"
+if windows_workflow.exists():
+    windows_workflow.unlink()
+
+# py_compile is part of the guard, but bytecode is never source material.
+for pycache in ROOT.rglob("__pycache__"):
+    shutil.rmtree(pycache)
 
 print("Дополнительные правки применены.")
