@@ -32,21 +32,18 @@ replace_once(
     '<div class="platforms" aria-label="Поддерживаемые платформы">',
     '<div class="platforms" role="list" aria-label="Поддерживаемые платформы">',
 )
-replace_once(
-    "website/index.html",
-    '<span class="platform">macOS · Apple Silicon и Intel</span>',
-    '<span class="platform" role="listitem">macOS · Apple Silicon и Intel</span>',
-)
-replace_once(
-    "website/index.html",
-    '<span class="platform">Windows · x64</span>',
-    '<span class="platform" role="listitem">Windows · x64</span>',
-)
-replace_once(
-    "website/index.html",
-    '<span class="platform">Linux · x64</span>',
-    '<span class="platform" role="listitem">Linux · x64</span>',
-)
+for platform in (
+    'macOS · Apple Silicon и Intel',
+    'Windows · x64',
+    'Linux · AppImage и deb',
+    'Браузер · PWA',
+    'iOS и Android · Capacitor',
+):
+    replace_once(
+        "website/index.html",
+        f'<span class="platform">{platform}</span>',
+        f'<span class="platform" role="listitem">{platform}</span>',
+    )
 
 # Windows PowerShell 5.1 has no Set-Content -Encoding utf8NoBOM value.
 replace_once(
