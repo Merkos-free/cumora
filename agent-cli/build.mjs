@@ -42,7 +42,10 @@ const forkRuntimePatch = {
   name: 'fork-runtime-patch',
   setup(b) {
     b.onLoad({ filter: /[\\/]server[\\/]src[\\/]agents[\\/]computer[\\/]daemon\.ts$/ }, (args) => {
-      let contents = readFileSync(args.path, 'utf8')
+      // Git for Windows обычно выдаёт рабочие файлы с CRLF. Для точных
+      // защитных markers нормализуем только загруженную в память копию:
+      // исходник на диске и история Git не меняются.
+      let contents = readFileSync(args.path, 'utf8').replace(/\r\n/g, '\n')
 
       const updateMarker = 'async function checkForUpdate(onSupervisedUpdate: () => void): Promise<void> {\n  try {'
       if (!contents.includes(updateMarker)) {
