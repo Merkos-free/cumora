@@ -44,12 +44,20 @@ jobs:
           git diff --check
 
       - name: Проверить код перед коммитом
+        env:
+          OPENAI_API_KEY: ci-test-openai-key
         run: |
           npm ci
+          npm ci --prefix workers/email-gate
           npm run lint
           npm run typecheck
           npm run server:typecheck
           npm test
+
+      - name: Проверить BYOA-only без OpenAI API-ключа
+        shell: bash
+        run: |
+          env -u OPENAI_API_KEY CUMORA_BYOA_ONLY=true node --import tsx --input-type=module -e "const { env } = await import('./server/src/env.ts'); if (!env.BYOA_ONLY) process.exit(1); if (env.OPENAI_API_KEY !== 'cumora-byoa-only-no-cloud-key') process.exit(1); console.log('BYOA-only без ключа: OK')"
 
       - name: Зафиксировать результат в рабочей ветке
         shell: bash
