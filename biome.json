@@ -106,9 +106,6 @@
         "rules": {
           "a11y": {
             "noAriaUnsupportedElements": "off"
-          },
-          "correctness": {
-            "useSortedProperties": "off"
           }
         }
       }
