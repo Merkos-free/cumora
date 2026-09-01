@@ -5,6 +5,7 @@ on:
     branches: [localization/ru-conversational]
     paths:
       - "scripts/finalize-russian-fork.py"
+      - "scripts/finalize-russian-fork-fixes.py"
       - ".github/workflows/finalize-russian-fork.yml"
   workflow_dispatch:
 
@@ -37,8 +38,9 @@ jobs:
 
       - name: Применить воспроизводимые изменения
         run: |
-          python -m py_compile scripts/finalize-russian-fork.py
+          python -m py_compile scripts/finalize-russian-fork.py scripts/finalize-russian-fork-fixes.py
           python scripts/finalize-russian-fork.py
+          python scripts/finalize-russian-fork-fixes.py
           git diff --check
 
       - name: Проверить код перед коммитом
