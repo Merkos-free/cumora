@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Open the downloaded Bunny Soft Toy .blend, add a tiny showcase idle,
-render a preview, and export a browser-ready GLB while preserving the armature.
+render a close studio preview, and export a browser-ready GLB while preserving the armature.
 Runs inside Blender in background mode.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 
@@ -66,10 +65,9 @@ def ensure_idle(arms):
     arm.animation_data_create()
     arm.animation_data.action = action
 
-    # Whole-character breathing/bounce: safe regardless of bone naming.
     base_z = arm.location.z
     base_rot = arm.rotation_euler.copy()
-    for frame, dz, yaw in [(1, 0.0, -0.025), (30, 0.035, 0.025), (60, 0.0, -0.025)]:
+    for frame, dz, yaw in [(1, 0.0, -0.025), (30, 0.018, 0.025), (60, 0.0, -0.025)]:
         arm.location.z = base_z + dz
         arm.rotation_euler = base_rot
         arm.rotation_euler[2] += yaw
@@ -84,7 +82,7 @@ def ensure_idle(arms):
     if head:
         head.rotation_mode = "XYZ"
         original = head.rotation_euler.copy()
-        for frame, tilt in [(1, -0.05), (30, 0.06), (60, -0.05)]:
+        for frame, tilt in [(1, -0.04), (30, 0.05), (60, -0.04)]:
             head.rotation_euler = original.copy()
             head.rotation_euler[1] += tilt
             head.keyframe_insert(data_path="rotation_euler", frame=frame)
@@ -92,7 +90,7 @@ def ensure_idle(arms):
         ear.rotation_mode = "XYZ"
         original = ear.rotation_euler.copy()
         sign = -1 if idx % 2 else 1
-        for frame, bend in [(1, 0.0), (20, 0.10 * sign), (40, -0.07 * sign), (60, 0.0)]:
+        for frame, bend in [(1, 0.0), (20, 0.08 * sign), (40, -0.055 * sign), (60, 0.0)]:
             ear.rotation_euler = original.copy()
             ear.rotation_euler[0] += bend
             ear.keyframe_insert(data_path="rotation_euler", frame=frame)
@@ -105,7 +103,6 @@ def ensure_idle(arms):
 
 
 def make_preview(meshes, out_path: str):
-    # Clean preview-only cameras/lights; leave model intact.
     for o in list(bpy.data.objects):
         if o.type in {"CAMERA", "LIGHT"}:
             bpy.data.objects.remove(o, do_unlink=True)
@@ -115,23 +112,23 @@ def make_preview(meshes, out_path: str):
     center = (lo + hi) / 2
     max_dim = max(size.x, size.y, size.z, 0.1)
 
-    # Soft studio floor.
-    bpy.ops.mesh.primitive_plane_add(size=max_dim * 6, location=(0, 0, lo.z - 0.01))
+    # Matte warm floor that won't blow out white fur.
+    bpy.ops.mesh.primitive_plane_add(size=max_dim * 8, location=(0, 0, lo.z - 0.008))
     floor = bpy.context.object
     floor.name = "PREVIEW_Floor"
     mat = bpy.data.materials.new("PREVIEW_FloorMat")
-    mat.diffuse_color = (0.92, 0.88, 0.82, 1)
-    mat.roughness = 0.92
+    mat.diffuse_color = (0.22, 0.17, 0.15, 1)
+    mat.roughness = 0.88
     floor.data.materials.append(mat)
 
-    # Camera with a slightly elevated product-shot angle.
+    # Close portrait framing; selected asset is only ~50 cm tall.
     cam_data = bpy.data.cameras.new("PREVIEW_Camera")
     cam = bpy.data.objects.new("PREVIEW_Camera", cam_data)
     bpy.context.scene.collection.objects.link(cam)
-    cam.location = (max_dim * 2.3, -max_dim * 3.6, max_dim * 1.65)
-    direction = center - cam.location
-    cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-    cam_data.lens = 58
+    cam.location = (max_dim * 1.15, -max_dim * 2.45, max_dim * 1.15)
+    target = center + Vector((0, 0, max_dim * 0.03))
+    cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
+    cam_data.lens = 62
     bpy.context.scene.camera = cam
 
     def add_area(name, loc, energy, size_area, color):
@@ -146,13 +143,16 @@ def make_preview(meshes, out_path: str):
         obj.rotation_euler = (center - obj.location).to_track_quat("-Z", "Y").to_euler()
         return obj
 
-    add_area("PREVIEW_Key", (-max_dim * 2.2, -max_dim * 2.7, max_dim * 3.2), 900, max_dim * 3, (1.0, 0.78, 0.68))
-    add_area("PREVIEW_Fill", (max_dim * 2.8, -max_dim * 1.0, max_dim * 1.9), 650, max_dim * 2.5, (0.72, 0.82, 1.0))
-    add_area("PREVIEW_Rim", (0, max_dim * 2.0, max_dim * 3.0), 1000, max_dim * 2.0, (1.0, 0.6, 0.68))
+    add_area("PREVIEW_Key", (-max_dim * 1.55, -max_dim * 1.85, max_dim * 2.45), 85, max_dim * 2.4, (1.0, 0.78, 0.70))
+    add_area("PREVIEW_Fill", (max_dim * 2.0, -max_dim * 0.75, max_dim * 1.55), 42, max_dim * 2.4, (0.74, 0.84, 1.0))
+    add_area("PREVIEW_Rim", (0, max_dim * 1.25, max_dim * 2.0), 65, max_dim * 1.8, (1.0, 0.58, 0.68))
 
     world = bpy.context.scene.world or bpy.data.worlds.new("World")
     bpy.context.scene.world = world
-    world.color = (0.055, 0.045, 0.04)
+    world.use_nodes = True
+    bg = world.node_tree.nodes.get("Background")
+    bg.inputs["Color"].default_value = (0.018, 0.014, 0.014, 1)
+    bg.inputs["Strength"].default_value = 0.18
 
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -160,14 +160,14 @@ def make_preview(meshes, out_path: str):
     scene.render.resolution_y = 1000
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
+    scene.render.image_settings.color_mode = "RGBA"
     scene.render.film_transparent = False
     scene.render.filepath = out_path
-    scene.render.image_settings.color_mode = "RGBA"
-    scene.render.resolution_percentage = 100
+    scene.view_settings.look = "AgX - Medium High Contrast"
+    scene.view_settings.exposure = -0.7
+    scene.view_settings.gamma = 1.0
     scene.frame_set(1)
     bpy.ops.render.render(write_still=True)
-
-    # Mark preview-only objects for easy exclusion from GLB.
     return [floor, cam] + [o for o in bpy.context.scene.objects if o.name.startswith("PREVIEW_") and o.type == "LIGHT"]
 
 
@@ -197,9 +197,9 @@ def main():
     Path(args.preview).parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.open_mainfile(filepath=str(Path(args.input).resolve()))
     objs, meshes, arms = model_objects()
-    lo0, hi0 = center_model(objs, meshes)
+    center_model(objs, meshes)
     idle = ensure_idle(arms)
-    preview_objects = make_preview(meshes, str(Path(args.preview).resolve()))
+    make_preview(meshes, str(Path(args.preview).resolve()))
     export_glb(objs, str(Path(args.output).resolve()))
 
     lo, hi = world_bbox(meshes)
