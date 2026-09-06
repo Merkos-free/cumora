@@ -1,0 +1,32 @@
+{
+  "mesh": "MYAGKO_Premium_Bunny",
+  "vertices": 21740,
+  "polygons": 29898,
+  "armature": "Bunny Soft Toy Armature",
+  "bones": [
+    "body_3",
+    "body_2",
+    "body_1",
+    "head",
+    "leftEar_1",
+    "leftEar_2",
+    "rightEar_1",
+    "rightEar_2",
+    "leftHand_1",
+    "leftHand_2",
+    "rightHand_1",
+    "rightHand_2",
+    "leftLeg_1",
+    "leftLeg_2",
+    "rightLeg_1",
+    "rightLeg_2",
+    "tail"
+  ],
+  "action": "MYAGKO_ScrollStory",
+  "frames": [
+    1,
+    120
+  ],
+  "glbBytes": 2481248,
+  "previewBytes": 766587
+}
