@@ -1,0 +1,92 @@
+{
+  "objects": [
+    {
+      "name": "Bunny Soft Toy.001",
+      "type": "MESH"
+    },
+    {
+      "name": "Bunny Soft Toy Armature",
+      "type": "ARMATURE"
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Bunny Soft Toy.001",
+      "vertices": 590,
+      "polygons": 580
+    }
+  ],
+  "armatures": [
+    {
+      "name": "Bunny Soft Toy Armature",
+      "bones": [
+        "body_3",
+        "body_2",
+        "body_1",
+        "head",
+        "leftEar_1",
+        "leftEar_2",
+        "rightEar_1",
+        "rightEar_2",
+        "leftHand_1",
+        "leftHand_2",
+        "rightHand_1",
+        "rightHand_2",
+        "leftLeg_1",
+        "leftLeg_2",
+        "rightLeg_1",
+        "rightLeg_2",
+        "tail"
+      ]
+    }
+  ],
+  "materials": [
+    "cloth",
+    "hair",
+    "plastic"
+  ],
+  "bbox": {
+    "min": [
+      -0.23137114942073822,
+      -0.16477243602275848,
+      0.0
+    ],
+    "max": [
+      0.2317613661289215,
+      0.1647675633430481,
+      0.5071451663970947
+    ]
+  },
+  "idle": {
+    "created": true,
+    "armature": "Bunny Soft Toy Armature",
+    "bones": [
+      "body_3",
+      "body_2",
+      "body_1",
+      "head",
+      "leftEar_1",
+      "leftEar_2",
+      "rightEar_1",
+      "rightEar_2",
+      "leftHand_1",
+      "leftHand_2",
+      "rightHand_1",
+      "rightHand_2",
+      "leftLeg_1",
+      "leftLeg_2",
+      "rightLeg_1",
+      "rightLeg_2",
+      "tail"
+    ],
+    "head": "head",
+    "ears": [
+      "leftEar_1",
+      "leftEar_2",
+      "rightEar_1",
+      "rightEar_2"
+    ]
+  },
+  "glbBytes": 90560,
+  "previewBytes": 1211288
+}
