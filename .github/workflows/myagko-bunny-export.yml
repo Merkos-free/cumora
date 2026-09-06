@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   export-bunny:
@@ -55,6 +55,20 @@ jobs:
           test -s experiments/myagko-3d/out/bunny-soft-toy.glb
           test -s experiments/myagko-3d/out/bunny-preview.png
           cat experiments/myagko-3d/out/bunny-summary.json
+
+      - name: Publish generated web assets to preview branch
+        run: |
+          mkdir -p experiments/myagko-3d/site
+          cp experiments/myagko-3d/out/bunny-soft-toy.glb experiments/myagko-3d/site/bunny-soft-toy.glb
+          cp experiments/myagko-3d/out/bunny-preview.png experiments/myagko-3d/site/bunny-preview.png
+          cp experiments/myagko-3d/out/bunny-summary.json experiments/myagko-3d/site/bunny-summary.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add experiments/myagko-3d/site/bunny-soft-toy.glb experiments/myagko-3d/site/bunny-preview.png experiments/myagko-3d/site/bunny-summary.json
+          if ! git diff --cached --quiet; then
+            git commit -m "build(myagko): publish generated bunny 3d assets"
+            git push origin HEAD:myagko-3d-lab
+          fi
 
       - name: Upload private build artifact
         uses: actions/upload-artifact@v4
