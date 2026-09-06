@@ -112,7 +112,6 @@ def make_preview(meshes, out_path: str):
     center = (lo + hi) / 2
     max_dim = max(size.x, size.y, size.z, 0.1)
 
-    # Matte warm floor that won't blow out white fur.
     bpy.ops.mesh.primitive_plane_add(size=max_dim * 8, location=(0, 0, lo.z - 0.008))
     floor = bpy.context.object
     floor.name = "PREVIEW_Floor"
@@ -121,7 +120,6 @@ def make_preview(meshes, out_path: str):
     mat.roughness = 0.88
     floor.data.materials.append(mat)
 
-    # Close portrait framing; selected asset is only ~50 cm tall.
     cam_data = bpy.data.cameras.new("PREVIEW_Camera")
     cam = bpy.data.objects.new("PREVIEW_Camera", cam_data)
     bpy.context.scene.collection.objects.link(cam)
@@ -163,7 +161,7 @@ def make_preview(meshes, out_path: str):
     scene.render.image_settings.color_mode = "RGBA"
     scene.render.film_transparent = False
     scene.render.filepath = out_path
-    scene.view_settings.look = "AgX - Medium High Contrast"
+    scene.view_settings.look = "Medium High Contrast"
     scene.view_settings.exposure = -0.7
     scene.view_settings.gamma = 1.0
     scene.frame_set(1)
