@@ -81,3 +81,5 @@ jobs:
             experiments/myagko-3d/source/bunny.json
           if-no-files-found: error
           retention-days: 3
+
+# retry publish from current branch head; no concurrent writes during this run
