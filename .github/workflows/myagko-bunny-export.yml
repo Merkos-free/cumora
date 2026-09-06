@@ -67,6 +67,8 @@ jobs:
           git add experiments/myagko-3d/site/bunny-soft-toy.glb experiments/myagko-3d/site/bunny-preview.png experiments/myagko-3d/site/bunny-summary.json
           if ! git diff --cached --quiet; then
             git commit -m "build(myagko): publish generated bunny 3d assets"
+            git fetch origin myagko-3d-lab
+            git rebase origin/myagko-3d-lab
             git push origin HEAD:myagko-3d-lab
           fi
 
@@ -81,5 +83,3 @@ jobs:
             experiments/myagko-3d/source/bunny.json
           if-no-files-found: error
           retention-days: 3
-
-# retry publish from current branch head; no concurrent writes during this run
