@@ -1,0 +1,87 @@
+name: Myagko Premium Bunny Rig
+
+on:
+  push:
+    branches: [myagko-3d-lab]
+    paths:
+      - '.github/workflows/myagko-to3d-rig.yml'
+      - 'experiments/myagko-3d/scripts/rig_to3d_bunny.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rig-premium-bunny:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download BlenderKit base armature source
+        run: python3 experiments/myagko-3d/scripts/fetch_blendkit_bunny.py
+
+      - name: Download generated to3D model
+        run: |
+          mkdir -p experiments/myagko-3d/source
+          curl --fail --location --retry 4 \
+            'https://storage.to3d.app/generated-3d/models/2026-09-06/task_0ebc174f-9c6a-44fe-b6ed-3610cf69acf2_model.glb' \
+            -o experiments/myagko-3d/source/premium-bunny-to3d.glb
+          test -s experiments/myagko-3d/source/premium-bunny-to3d.glb
+          ls -lh experiments/myagko-3d/source/premium-bunny-to3d.glb
+
+      - name: Install Blender runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 libsm6 libice6 libwayland-client0 libwayland-egl1
+
+      - name: Download Blender 4.5 LTS
+        run: |
+          curl --fail --location --retry 3 --output /tmp/blender.tar.xz https://download.blender.org/release/Blender4.5/blender-4.5.13-linux-x64.tar.xz
+          mkdir -p /tmp/blender
+          tar -xJf /tmp/blender.tar.xz -C /tmp/blender --strip-components=1
+          /tmp/blender/blender --version | head -n 2
+
+      - name: Rig and animate premium bunny
+        env:
+          EGL_PLATFORM: surfaceless
+        run: |
+          mkdir -p experiments/myagko-3d/out-premium
+          /tmp/blender/blender --background \
+            --python experiments/myagko-3d/scripts/rig_to3d_bunny.py -- \
+            --base-blend experiments/myagko-3d/source/bunny.blend \
+            --generated-glb experiments/myagko-3d/source/premium-bunny-to3d.glb \
+            --output experiments/myagko-3d/out-premium/premium-bunny-rigged.glb \
+            --preview experiments/myagko-3d/out-premium/premium-bunny-preview.png \
+            --summary experiments/myagko-3d/out-premium/premium-bunny-summary.json
+
+      - name: Verify
+        run: |
+          test -s experiments/myagko-3d/out-premium/premium-bunny-rigged.glb
+          test -s experiments/myagko-3d/out-premium/premium-bunny-preview.png
+          cat experiments/myagko-3d/out-premium/premium-bunny-summary.json
+
+      - name: Publish premium web assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin myagko-3d-lab
+          git reset --hard origin/myagko-3d-lab
+          mkdir -p experiments/myagko-3d/site-premium
+          cp experiments/myagko-3d/out-premium/premium-bunny-rigged.glb experiments/myagko-3d/site-premium/premium-bunny-rigged.glb
+          cp experiments/myagko-3d/out-premium/premium-bunny-preview.png experiments/myagko-3d/site-premium/premium-bunny-preview.png
+          cp experiments/myagko-3d/out-premium/premium-bunny-summary.json experiments/myagko-3d/site-premium/premium-bunny-summary.json
+          git add experiments/myagko-3d/site-premium
+          if ! git diff --cached --quiet; then
+            git commit -m 'build(myagko): publish premium rigged bunny assets'
+            git push origin HEAD:myagko-3d-lab
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myagko-premium-bunny-rigged
+          path: experiments/myagko-3d/out-premium/
+          retention-days: 3
