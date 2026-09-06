@@ -22,6 +22,13 @@ jobs:
         run: |
           python3 experiments/myagko-3d/scripts/fetch_blendkit_bunny.py
 
+      - name: Install Blender runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 \
+            libxkbcommon0 libsm6 libice6 libwayland-client0 libwayland-egl1
+
       - name: Download Blender 4.5 LTS
         run: |
           curl --fail --location --retry 3 --output /tmp/blender.tar.xz \
@@ -31,6 +38,8 @@ jobs:
           /tmp/blender/blender --version | head -n 2
 
       - name: Export browser GLB and studio preview
+        env:
+          EGL_PLATFORM: surfaceless
         run: |
           mkdir -p experiments/myagko-3d/out
           /tmp/blender/blender --background \
