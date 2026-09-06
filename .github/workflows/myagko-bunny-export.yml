@@ -1,0 +1,60 @@
+name: Myagko Bunny 3D Export
+
+on:
+  push:
+    branches: [myagko-3d-lab]
+    paths:
+      - '.github/workflows/myagko-bunny-export.yml'
+      - 'experiments/myagko-3d/scripts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-bunny:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch selected free Blendkit asset
+        run: |
+          python3 experiments/myagko-3d/scripts/fetch_blendkit_bunny.py
+
+      - name: Download Blender 4.5 LTS
+        run: |
+          curl --fail --location --retry 3 --output /tmp/blender.tar.xz \
+            https://download.blender.org/release/Blender4.5/blender-4.5.13-linux-x64.tar.xz
+          mkdir -p /tmp/blender
+          tar -xJf /tmp/blender.tar.xz -C /tmp/blender --strip-components=1
+          /tmp/blender/blender --version | head -n 2
+
+      - name: Export browser GLB and studio preview
+        run: |
+          mkdir -p experiments/myagko-3d/out
+          /tmp/blender/blender --background \
+            --python experiments/myagko-3d/scripts/export_bunny_glb.py -- \
+            --input experiments/myagko-3d/source/bunny.blend \
+            --output experiments/myagko-3d/out/bunny-soft-toy.glb \
+            --preview experiments/myagko-3d/out/bunny-preview.png \
+            --summary experiments/myagko-3d/out/bunny-summary.json
+
+      - name: Verify outputs
+        run: |
+          ls -lh experiments/myagko-3d/out
+          test -s experiments/myagko-3d/out/bunny-soft-toy.glb
+          test -s experiments/myagko-3d/out/bunny-preview.png
+          cat experiments/myagko-3d/out/bunny-summary.json
+
+      - name: Upload private build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myagko-bunny-3d
+          path: |
+            experiments/myagko-3d/out/bunny-soft-toy.glb
+            experiments/myagko-3d/out/bunny-preview.png
+            experiments/myagko-3d/out/bunny-summary.json
+            experiments/myagko-3d/source/bunny.json
+          if-no-files-found: error
+          retention-days: 3
